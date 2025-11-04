@@ -1,10 +1,8 @@
 import { motion } from "framer-motion";
-import Navigation from "@/components/Navigation";
 
 const About = () => {
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
 
       <main className="pt-24 pb-20 px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">

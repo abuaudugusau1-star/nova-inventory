@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import Navigation from "@/components/Navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, TrendingUp, Package, AlertCircle } from "lucide-react";
@@ -18,7 +17,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
 
       <main className="pt-24 pb-20 px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">

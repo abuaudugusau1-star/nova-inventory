@@ -1,12 +1,10 @@
 import { motion } from "framer-motion";
-import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Mail, Phone, MapPin } from "lucide-react";
 
 const Contact = () => {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <Navigation />
 
       {/* Wavy Background */}
       <div className="absolute inset-0 opacity-20">

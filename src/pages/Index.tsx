@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import Navigation from "@/components/Navigation";
 import WavyLines from "@/components/WavyLines";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
@@ -8,7 +7,6 @@ import { Link } from "react-router-dom";
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-hero relative overflow-hidden">
-      <Navigation />
 
       {/* Gradient Glow Effect */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-96 bg-gradient-glow opacity-50 blur-3xl" />
