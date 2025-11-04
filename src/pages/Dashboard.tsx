@@ -61,6 +61,8 @@ const Dashboard = () => {
     price: 0,
     category: "",
   });
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const { user, loading: authLoading } = useAuth();
@@ -104,6 +106,32 @@ const Dashboard = () => {
     }
   };
 
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user?.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError, data } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Image Upload Failed",
+        description: error.message,
+      });
+      return null;
+    }
+  };
+
   const handleAdd = async () => {
     setFormErrors({});
     
@@ -120,10 +148,17 @@ const Dashboard = () => {
     }
 
     try {
+      let imageUrl = null;
+      if (selectedImage) {
+        imageUrl = await uploadImage(selectedImage);
+        if (!imageUrl) return;
+      }
+
       const { error } = await supabase.from('items').insert([
         {
           ...formData,
           user_id: user?.id,
+          image_url: imageUrl,
         },
       ]);
 
@@ -136,6 +171,8 @@ const Dashboard = () => {
 
       setIsAddDialogOpen(false);
       setFormData({ name: "", quantity: 0, price: 0, category: "" });
+      setSelectedImage(null);
+      setImagePreview(null);
       fetchItems();
     } catch (error: any) {
       toast({
@@ -164,9 +201,22 @@ const Dashboard = () => {
     }
 
     try {
+      let imageUrl = editingItem.image_url;
+      
+      if (selectedImage) {
+        // Delete old image if exists
+        if (editingItem.image_url) {
+          const oldPath = editingItem.image_url.split('/').slice(-2).join('/');
+          await supabase.storage.from('product-images').remove([oldPath]);
+        }
+        
+        imageUrl = await uploadImage(selectedImage);
+        if (!imageUrl && selectedImage) return;
+      }
+
       const { error } = await supabase
         .from('items')
-        .update(formData)
+        .update({ ...formData, image_url: imageUrl })
         .eq('id', editingItem.id);
 
       if (error) throw error;
@@ -179,6 +229,8 @@ const Dashboard = () => {
       setIsEditDialogOpen(false);
       setEditingItem(null);
       setFormData({ name: "", quantity: 0, price: 0, category: "" });
+      setSelectedImage(null);
+      setImagePreview(null);
       fetchItems();
     } catch (error: any) {
       toast({
@@ -193,6 +245,12 @@ const Dashboard = () => {
     if (!deleteConfirmItem) return;
 
     try {
+      // Delete image from storage if exists
+      if (deleteConfirmItem.image_url) {
+        const imagePath = deleteConfirmItem.image_url.split('/').slice(-2).join('/');
+        await supabase.storage.from('product-images').remove([imagePath]);
+      }
+
       const { error } = await supabase
         .from('items')
         .delete()
@@ -227,8 +285,30 @@ const Dashboard = () => {
       price: item.price,
       category: item.category,
     });
+    setSelectedImage(null);
+    setImagePreview(item.image_url || null);
     setFormErrors({});
     setIsEditDialogOpen(true);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          variant: "destructive",
+          title: "File too large",
+          description: "Image must be less than 5MB",
+        });
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const filteredItems = items.filter((item) =>
@@ -278,6 +358,21 @@ const Dashboard = () => {
                   <DialogTitle>Add New Item</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
+                  <div>
+                    <Label htmlFor="image">Product Image</Label>
+                    <Input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="mt-2"
+                    />
+                    {imagePreview && (
+                      <div className="mt-3 relative w-32 h-32 rounded-lg overflow-hidden border border-border">
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
                   <div>
                     <Label htmlFor="name">Name</Label>
                     <Input
@@ -362,6 +457,15 @@ const Dashboard = () => {
                     />
                   </div>
                   <div className="p-8">
+                    {selectedItem.image_url && (
+                      <div className="mb-6 w-full h-48 rounded-xl overflow-hidden border border-border">
+                        <img 
+                          src={selectedItem.image_url} 
+                          alt={selectedItem.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
                     <h2 className="text-3xl font-bold mb-4">{selectedItem.name}</h2>
                     <div className="space-y-4">
                       <div>
@@ -451,7 +555,20 @@ const Dashboard = () => {
                           onClick={() => setSelectedProduct(item.id)}
                         >
                           <td className="p-4">
-                            <span className="font-medium">{item.name}</span>
+                            <div className="flex items-center gap-3">
+                              {item.image_url ? (
+                                <img 
+                                  src={item.image_url} 
+                                  alt={item.name}
+                                  className="w-10 h-10 rounded-lg object-cover border border-border"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                                  <Package className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                              )}
+                              <span className="font-medium">{item.name}</span>
+                            </div>
                           </td>
                           <td className="p-4 text-muted-foreground">{item.category}</td>
                           <td className="p-4">
@@ -500,7 +617,72 @@ const Dashboard = () => {
             <DialogTitle>Edit Item</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-...
+            <div>
+              <Label htmlFor="edit-image">Product Image</Label>
+              <Input
+                id="edit-image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="mt-2"
+              />
+              {imagePreview && (
+                <div className="mt-3 relative w-32 h-32 rounded-lg overflow-hidden border border-border">
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="mt-2"
+              />
+              {formErrors.name && (
+                <p className="text-sm text-destructive mt-1">{formErrors.name}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="edit-quantity">Quantity</Label>
+              <Input
+                id="edit-quantity"
+                type="number"
+                value={formData.quantity}
+                onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                className="mt-2"
+              />
+              {formErrors.quantity && (
+                <p className="text-sm text-destructive mt-1">{formErrors.quantity}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="edit-price">Price</Label>
+              <Input
+                id="edit-price"
+                type="number"
+                step="0.01"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                className="mt-2"
+              />
+              {formErrors.price && (
+                <p className="text-sm text-destructive mt-1">{formErrors.price}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="edit-category">Category</Label>
+              <Input
+                id="edit-category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="mt-2"
+              />
+              {formErrors.category && (
+                <p className="text-sm text-destructive mt-1">{formErrors.category}</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
