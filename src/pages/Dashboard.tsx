@@ -1,23 +1,256 @@
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, TrendingUp, Package, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, TrendingUp, Package, AlertCircle, Edit, Trash2, Search } from "lucide-react";
 import Product3D from "@/components/Product3D";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
+import { z } from "zod";
+
+interface Item {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  category: string;
+  image_url?: string;
+}
+
+const itemSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100, "Name too long"),
+  quantity: z.number().min(0, "Quantity must be positive"),
+  price: z.number().min(0, "Price must be positive"),
+  category: z.string().min(1, "Category is required"),
+});
 
 const Dashboard = () => {
-  const [selectedProduct, setSelectedProduct] = useState<number | null>(1);
-  
-  const inventoryItems = [
-    { id: 1, name: "Golden Apple", stock: 245, category: "Premium", trend: "+12%", color: "#FFD700" },
-    { id: 2, name: "Purple Grape", stock: 189, category: "Fresh", trend: "+8%", color: "#A020F0" },
-    { id: 3, name: "Crystal Berry", stock: 56, category: "Exotic", trend: "-3%", color: "#FF1493" },
-    { id: 4, name: "Solar Orange", stock: 320, category: "Citrus", trend: "+15%", color: "#FF6B35" },
-  ];
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<Item | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    quantity: 0,
+    price: 0,
+    category: "",
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      fetchItems();
+    }
+  }, [user]);
+
+  const fetchItems = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setItems(data || []);
+      if (data && data.length > 0 && !selectedProduct) {
+        setSelectedProduct(data[0].id);
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdd = async () => {
+    setFormErrors({});
+    
+    const result = itemSchema.safeParse(formData);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          errors[err.path[0] as string] = err.message;
+        }
+      });
+      setFormErrors(errors);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('items').insert([
+        {
+          ...formData,
+          user_id: user?.id,
+        },
+      ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Item added successfully!",
+      });
+
+      setIsAddDialogOpen(false);
+      setFormData({ name: "", quantity: 0, price: 0, category: "" });
+      fetchItems();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!editingItem) return;
+
+    setFormErrors({});
+    
+    const result = itemSchema.safeParse(formData);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          errors[err.path[0] as string] = err.message;
+        }
+      });
+      setFormErrors(errors);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('items')
+        .update(formData)
+        .eq('id', editingItem.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Item updated successfully!",
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingItem(null);
+      setFormData({ name: "", quantity: 0, price: 0, category: "" });
+      fetchItems();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirmItem) return;
+
+    try {
+      const { error } = await supabase
+        .from('items')
+        .delete()
+        .eq('id', deleteConfirmItem.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Item deleted successfully!",
+      });
+
+      setDeleteConfirmItem(null);
+      if (selectedProduct === deleteConfirmItem.id) {
+        setSelectedProduct(null);
+      }
+      fetchItems();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    }
+  };
+
+  const openEditDialog = (item: Item) => {
+    setEditingItem(item);
+    setFormData({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      category: item.category,
+    });
+    setFormErrors({});
+    setIsEditDialogOpen(true);
+  };
+
+  const filteredItems = items.filter((item) =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const stats = {
+    totalItems: items.reduce((sum, item) => sum + item.quantity, 0),
+    lowStock: items.filter((item) => item.quantity < 100).length,
+    revenue: items.reduce((sum, item) => sum + item.quantity * Number(item.price), 0),
+    categories: new Set(items.map((item) => item.category)).size,
+  };
+
+  const selectedItem = items.find((item) => item.id === selectedProduct);
+
+  if (authLoading || !user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
-
       <main className="pt-24 pb-20 px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -33,101 +266,140 @@ const Dashboard = () => {
                 Real-time insights and complete control at your fingertips
               </p>
             </div>
-            <Button className="bg-primary hover:bg-primary/90 rounded-full px-6 shadow-glow">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item
-            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90 rounded-full px-6 shadow-glow">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Item
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle>Add New Item</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div>
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="mt-2"
+                    />
+                    {formErrors.name && (
+                      <p className="text-sm text-destructive mt-1">{formErrors.name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                      className="mt-2"
+                    />
+                    {formErrors.quantity && (
+                      <p className="text-sm text-destructive mt-1">{formErrors.quantity}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="price">Price</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                      className="mt-2"
+                    />
+                    {formErrors.price && (
+                      <p className="text-sm text-destructive mt-1">{formErrors.price}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Input
+                      id="category"
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="mt-2"
+                    />
+                    {formErrors.category && (
+                      <p className="text-sm text-destructive mt-1">{formErrors.category}</p>
+                    )}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAdd}>Add Item</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </motion.div>
 
           {/* Stats Cards */}
           <div className="grid md:grid-cols-4 gap-6 mb-12">
-            {[
-              { label: "Total Items", value: "810", icon: Package, color: "text-blue-400" },
-              { label: "Low Stock", value: "12", icon: AlertCircle, color: "text-orange-400" },
-              { label: "Revenue", value: "$45.2K", icon: TrendingUp, color: "text-green-400" },
-              { label: "Growth", value: "+18%", icon: TrendingUp, color: "text-purple-400" },
-            ].map((stat, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <Card className="bg-card border-border p-6 hover:border-primary/50 transition-all duration-300">
-                  <div className="flex items-center justify-between mb-2">
-                    <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                    <span className={`text-2xl font-bold ${stat.color}`}>{stat.value}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                </Card>
-              </motion.div>
-            ))}
+...
           </div>
 
           {/* 3D Product Showcase */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="mb-12"
-          >
-            <Card className="bg-card border-border overflow-hidden">
-              <div className="grid lg:grid-cols-2 gap-0">
-                {/* 3D Viewer */}
-                <div className="relative h-[500px] bg-gradient-to-br from-primary/10 to-accent/10">
-                  {selectedProduct && (
+          {selectedItem && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="mb-12"
+            >
+              <Card className="bg-card border-border overflow-hidden">
+                <div className="grid lg:grid-cols-2 gap-0">
+                  <div className="relative h-[500px] bg-gradient-to-br from-primary/10 to-accent/10">
                     <Product3D
-                      color={inventoryItems.find(i => i.id === selectedProduct)?.color}
-                      productName={inventoryItems.find(i => i.id === selectedProduct)?.name}
+                      color={selectedItem.category === 'Premium' ? '#FFD700' : selectedItem.category === 'Fresh' ? '#A020F0' : '#FF6B35'}
+                      productName={selectedItem.name}
                     />
-                  )}
-                </div>
-
-                {/* Product Selector */}
-                <div className="p-8 space-y-6">
-                  <div>
-                    <h2 className="text-3xl font-bold mb-2">3D Product Viewer</h2>
-                    <p className="text-muted-foreground">
-                      Interactive 3D visualization of your inventory items
-                    </p>
                   </div>
-
-                  <div className="space-y-3">
-                    {inventoryItems.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => setSelectedProduct(item.id)}
-                        className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-300 ${
-                          selectedProduct === item.id
-                            ? "border-primary bg-primary/10 shadow-glow"
-                            : "border-border hover:border-primary/50 bg-card"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-10 h-10 rounded-full"
-                              style={{ backgroundColor: item.color }}
-                            />
-                            <div>
-                              <p className="font-semibold">{item.name}</p>
-                              <p className="text-sm text-muted-foreground">{item.category}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium">Stock: {item.stock}</p>
-                            <p className={`text-sm ${item.trend.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
-                              {item.trend}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                  <div className="p-8">
+                    <h2 className="text-3xl font-bold mb-4">{selectedItem.name}</h2>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Category</p>
+                        <p className="text-xl font-semibold">{selectedItem.category}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Stock</p>
+                        <p className="text-xl font-semibold">{selectedItem.quantity} units</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Price</p>
+                        <p className="text-xl font-semibold">${Number(selectedItem.price).toFixed(2)}</p>
+                      </div>
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          onClick={() => openEditDialog(selectedItem)}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          onClick={() => setDeleteConfirmItem(selectedItem)}
+                          variant="destructive"
+                          className="flex-1"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          </motion.div>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Inventory Table */}
           <motion.div
@@ -136,64 +408,126 @@ const Dashboard = () => {
             transition={{ duration: 0.6, delay: 0.6 }}
           >
             <Card className="bg-card border-border overflow-hidden">
-              <div className="p-6 border-b border-border">
+              <div className="p-6 border-b border-border flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Current Inventory</h2>
+                <div className="relative w-64">
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search items..."
+                    className="pl-10"
+                  />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Product</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Stock</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Trend</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inventoryItems.map((item, index) => (
-                      <motion.tr
-                        key={item.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.4, delay: 0.7 + index * 0.1 }}
-                        className="border-b border-border hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => setSelectedProduct(item.id)}
-                      >
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-8 h-8 rounded-full"
-                              style={{ backgroundColor: item.color }}
-                            />
+                {loading ? (
+                  <div className="p-12 text-center text-muted-foreground">Loading...</div>
+                ) : filteredItems.length === 0 ? (
+                  <div className="p-12 text-center text-muted-foreground">
+                    {searchQuery ? "No items found matching your search." : "No items yet. Add your first item!"}
+                  </div>
+                ) : (
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Product</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Stock</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Price</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredItems.map((item, index) => (
+                        <motion.tr
+                          key={item.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.4, delay: 0.7 + index * 0.05 }}
+                          className={`border-b border-border hover:bg-muted/30 transition-colors cursor-pointer ${
+                            selectedProduct === item.id ? 'bg-primary/5' : ''
+                          }`}
+                          onClick={() => setSelectedProduct(item.id)}
+                        >
+                          <td className="p-4">
                             <span className="font-medium">{item.name}</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-muted-foreground">{item.category}</td>
-                        <td className="p-4">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
-                            {item.stock}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className={`font-medium ${item.trend.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
-                            {item.trend}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <Button variant="ghost" size="sm" className="hover:bg-primary/10">
-                            Edit
-                          </Button>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </tbody>
-                </table>
+                          </td>
+                          <td className="p-4 text-muted-foreground">{item.category}</td>
+                          <td className="p-4">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                              item.quantity < 100 ? 'bg-orange-500/10 text-orange-400' : 'bg-primary/10 text-primary'
+                            }`}>
+                              {item.quantity}
+                            </span>
+                          </td>
+                          <td className="p-4 font-medium">${Number(item.price).toFixed(2)}</td>
+                          <td className="p-4">
+                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(item)}
+                                className="hover:bg-primary/10"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteConfirmItem(item)}
+                                className="hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </Card>
           </motion.div>
         </div>
       </main>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Edit Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+...
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEdit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmItem} onOpenChange={() => setDeleteConfirmItem(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{deleteConfirmItem?.name}". This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

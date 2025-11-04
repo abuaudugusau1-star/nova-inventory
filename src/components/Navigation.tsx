@@ -1,11 +1,14 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const Navigation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, signOut, loading } = useAuth();
 
   const navLinks = [
     { name: "About", path: "/about" },
@@ -13,6 +16,14 @@ const Navigation = () => {
     { name: "Features", path: "/features" },
     { name: "Contact", path: "/contact" },
   ];
+
+  const handleAuthAction = () => {
+    if (user) {
+      signOut();
+    } else {
+      navigate('/auth');
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -48,8 +59,20 @@ const Navigation = () => {
 
           {/* CTA Button */}
           <div className="hidden md:block">
-            <Button variant="default" className="bg-secondary hover:bg-secondary/90 rounded-full px-6 shadow-subtle hover:scale-105 transition-transform duration-300">
-              Sign In
+            <Button
+              onClick={handleAuthAction}
+              disabled={loading}
+              variant="default"
+              className="bg-secondary hover:bg-secondary/90 rounded-full px-6 shadow-subtle hover:scale-105 transition-transform duration-300 flex items-center gap-2"
+            >
+              {user ? (
+                <>
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </div>
 
@@ -81,8 +104,20 @@ const Navigation = () => {
                 {link.name}
               </Link>
             ))}
-            <Button variant="default" className="w-full bg-secondary hover:bg-secondary/90 rounded-full">
-              Sign In
+            <Button
+              onClick={handleAuthAction}
+              disabled={loading}
+              variant="default"
+              className="w-full bg-secondary hover:bg-secondary/90 rounded-full flex items-center justify-center gap-2"
+            >
+              {user ? (
+                <>
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </div>
         </div>

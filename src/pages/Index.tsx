@@ -1,10 +1,21 @@
 import { motion } from "framer-motion";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import WavyLines from "@/components/WavyLines";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
+
   return (
     <div className="min-h-screen bg-gradient-hero relative overflow-hidden">
 
@@ -48,23 +59,21 @@ const Index = () => {
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="flex flex-wrap gap-4"
               >
-                <Link to="/dashboard">
-                  <Button
-                    size="lg"
-                    className="bg-secondary hover:bg-secondary/90 rounded-full px-8 shadow-subtle hover:scale-105 transition-all duration-300"
-                  >
-                    Free Trial
-                  </Button>
-                </Link>
-                <Link to="/features">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="rounded-full px-8 border-foreground/20 hover:bg-foreground/5 hover:scale-105 transition-all duration-300"
-                  >
-                    See More
-                  </Button>
-                </Link>
+                <Button
+                  size="lg"
+                  onClick={() => navigate('/auth')}
+                  className="bg-secondary hover:bg-secondary/90 rounded-full px-8 shadow-subtle hover:scale-105 transition-all duration-300"
+                >
+                  Free Trial
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate('/features')}
+                  className="rounded-full px-8 border-foreground/20 hover:bg-foreground/5 hover:scale-105 transition-all duration-300"
+                >
+                  See More
+                </Button>
               </motion.div>
 
               {/* Stats */}
