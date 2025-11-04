@@ -18,33 +18,42 @@ export type Database = {
         Row: {
           category: string | null
           created_at: string | null
+          description: string | null
           id: string
           image_url: string | null
+          is_public: boolean | null
           name: string
           price: number
           quantity: number
+          status: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           category?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           image_url?: string | null
+          is_public?: boolean | null
           name: string
           price?: number
           quantity?: number
+          status?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           category?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           image_url?: string | null
+          is_public?: boolean | null
           name?: string
           price?: number
           quantity?: number
+          status?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -52,31 +61,51 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bank_details: Json | null
+          contact_info: Json | null
           created_at: string | null
           email: string | null
           full_name: string | null
           id: string
+          referral_code: string | null
+          referred_by: string | null
         }
         Insert: {
+          bank_details?: Json | null
+          contact_info?: Json | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          referral_code?: string | null
+          referred_by?: string | null
         }
         Update: {
+          bank_details?: Json | null
+          contact_info?: Json | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          referral_code?: string | null
+          referred_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_referral_code: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never

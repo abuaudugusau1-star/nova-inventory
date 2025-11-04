@@ -11,10 +11,16 @@ const Navigation = () => {
   const { user, signOut, loading } = useAuth();
 
   const navLinks = [
+    { name: "Marketplace", path: "/marketplace" },
     { name: "About", path: "/about" },
-    { name: "Pricing", path: "/pricing" },
     { name: "Features", path: "/features" },
+    { name: "Pricing", path: "/pricing" },
     { name: "Contact", path: "/contact" },
+  ];
+
+  const userLinks = [
+    { name: "Dashboard", path: "/dashboard" },
+    { name: "Settings", path: "/settings" },
   ];
 
   const handleAuthAction = () => {
@@ -42,6 +48,20 @@ const Navigation = () => {
           {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`text-sm font-medium transition-all duration-300 relative group ${
+                  location.pathname === link.path
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {link.name}
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
+              </Link>
+            ))}
+            {user && userLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
@@ -91,6 +111,20 @@ const Navigation = () => {
         <div className="md:hidden bg-card border-t border-border animate-fade-in">
           <div className="px-6 py-4 space-y-4">
             {navLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block text-sm font-medium py-2 ${
+                  location.pathname === link.path
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {link.name}
+              </Link>
+            ))}
+            {user && userLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}

@@ -37,6 +37,9 @@ interface Item {
   price: number;
   category: string;
   image_url?: string;
+  description?: string;
+  is_public?: boolean;
+  status?: string;
 }
 
 const itemSchema = z.object({
@@ -60,6 +63,9 @@ const Dashboard = () => {
     quantity: 0,
     price: 0,
     category: "",
+    description: "",
+    is_public: false,
+    status: "available",
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -170,7 +176,7 @@ const Dashboard = () => {
       });
 
       setIsAddDialogOpen(false);
-      setFormData({ name: "", quantity: 0, price: 0, category: "" });
+      setFormData({ name: "", quantity: 0, price: 0, category: "", description: "", is_public: false, status: "available" });
       setSelectedImage(null);
       setImagePreview(null);
       fetchItems();
@@ -228,7 +234,7 @@ const Dashboard = () => {
 
       setIsEditDialogOpen(false);
       setEditingItem(null);
-      setFormData({ name: "", quantity: 0, price: 0, category: "" });
+      setFormData({ name: "", quantity: 0, price: 0, category: "", description: "", is_public: false, status: "available" });
       setSelectedImage(null);
       setImagePreview(null);
       fetchItems();
@@ -284,6 +290,9 @@ const Dashboard = () => {
       quantity: item.quantity,
       price: item.price,
       category: item.category,
+      description: item.description || "",
+      is_public: item.is_public || false,
+      status: item.status || "available",
     });
     setSelectedImage(null);
     setImagePreview(item.image_url || null);
@@ -423,6 +432,27 @@ const Dashboard = () => {
                     {formErrors.category && (
                       <p className="text-sm text-destructive mt-1">{formErrors.category}</p>
                     )}
+                  </div>
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Input
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="mt-2"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="is_public"
+                      checked={formData.is_public}
+                      onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="is_public" className="cursor-pointer">
+                      List on Marketplace
+                    </Label>
                   </div>
                 </div>
                 <DialogFooter>
@@ -682,6 +712,27 @@ const Dashboard = () => {
               {formErrors.category && (
                 <p className="text-sm text-destructive mt-1">{formErrors.category}</p>
               )}
+            </div>
+            <div>
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="mt-2"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="edit-is_public"
+                checked={formData.is_public}
+                onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="edit-is_public" className="cursor-pointer">
+                List on Marketplace
+              </Label>
             </div>
           </div>
           <DialogFooter>

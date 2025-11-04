@@ -12,6 +12,8 @@ import About from "./pages/About";
 import Pricing from "./pages/Pricing";
 import Features from "./pages/Features";
 import Contact from "./pages/Contact";
+import Marketplace from "./pages/Marketplace";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +30,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/about" element={<About />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/features" element={<Features />} />
